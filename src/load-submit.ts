@@ -12,10 +12,16 @@ if (!API_URL) {
 
 export const options = {
   stages: [
-    { duration: "30s", target: 10 },
-    { duration: "60s", target: 50 },
-    { duration: "10s", target: 0 },
+    { duration: "30s", target: 5 },
+    { duration: "60s", target: 10 },
+    { duration: "30s", target: 0 },
   ],
+  thresholds: {
+    // Fail the test if more than 1% of requests result in an error.
+    http_req_failed: ["rate<0.01"],
+    // Fail the test if 95% of requests don't complete within 2000ms.
+    http_req_duration: ["p(95)<2000"],
+  },
 };
 
 export default function () {
@@ -46,8 +52,11 @@ export default function () {
       },
     }
   );
+  console.log("r status", submitRes.status);
+  check(submitRes, {
+    "submission returns 200": (r) => r.status === 200,
+    "submission does not return 500": (r) => r.status !== 500,
+  });
 
-  check(submitRes, { "code submitted": (r) => r.status === 200 });
-
-  sleep(3);
+  sleep(5);
 }
