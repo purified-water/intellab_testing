@@ -1,6 +1,8 @@
 import http from "k6/http";
 import { check, sleep } from "k6";
 import { login } from "./auth";
+import { htmlReport } from "https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js";
+import { textSummary } from "https://jslib.k6.io/k6-summary/0.0.1/index.js";
 
 // Get API URL from environment variable
 const API_URL = __ENV.API_URL;
@@ -11,16 +13,35 @@ if (!API_URL) {
 }
 
 export const options = {
+  // Load testing with gradual ramp-up to test auto-scaling
+  // stages: [
+  //   { duration: "1m", target: 2 },
+  //   { duration: "5m", target: 30 },
+  //   { duration: "5m", target: 30 },
+  //   { duration: "1m", target: 0 },
+  // ],
+
+  // // Stress testing with constant load
+  // stages: [
+  //   { duration: "1m", target: 5 },
+  //   { duration: "1m", target: 15 },
+  //   { duration: "2m", target: 25 },
+  //   { duration: "2m", target: 35 },
+  //   { duration: "1m", target: 0 },
+  // ],
+
+  // Spike testing with sudden load increase
   stages: [
-    { duration: "30s", target: 5 },
-    { duration: "60s", target: 10 },
+    { duration: "30s", target: 1 },
+    { duration: "30s", target: 30 }, // sudden spike
+    { duration: "1m", target: 30 },
     { duration: "30s", target: 0 },
   ],
   thresholds: {
-    // Fail the test if more than 1% of requests result in an error.
-    http_req_failed: ["rate<0.01"],
-    // Fail the test if 95% of requests don't complete within 2000ms.
-    http_req_duration: ["p(95)<2000"],
+    // Allow higher error rate during load testing
+    http_req_failed: ["rate<0.10"],
+    // Fail the test if 95% of requests don't complete within 5000ms
+    http_req_duration: ["p(95)<5000"],
   },
 };
 
@@ -35,10 +56,17 @@ export default function () {
   }
   // Step 2: submit code
   const payload = JSON.stringify({
-    code: "import sys\ndef singleNumber(nums):\n    my_map = {}\n    \n    for num in nums:\n        if num not in my_map:\n            my_map[num] = 1\n        else:\n            my_map[num] += 1\n    \n    for key, value in my_map.items():\n        if value == 1:\n            return key\n    \n    return -1\n",
+    code: `
+    def twoSum(nums: list[int], target: int) -> list[int]:
+      for i in range(len(nums)):
+          for j in range(i + 1, len(nums)):
+              if nums[j] == target - nums[i]:
+                  return [i, j]
+      # Return an empty list if no solution is found
+      return []`,
     submitOrder: 1,
     programmingLanguage: "Python (3.8.1)",
-    problemId: "e608ebb7-07ef-4a2f-8081-92e5993e6118",
+    problemId: "591b3457-2157-4d61-b03d-d53f8666342c",
     userId: userId,
   });
 
@@ -58,5 +86,16 @@ export default function () {
     "submission does not return 500": (r) => r.status !== 500,
   });
 
-  sleep(5);
+  sleep(15);
+}
+
+export function handleSummary(data) {
+  // return {
+  //   "summary-load-2.html": htmlReport(data),
+  //   stdout: textSummary(data, { indent: " ", enableColors: false }),
+  // };
+  return {
+    "summary-spike-1.html": htmlReport(data),
+    stdout: textSummary(data, { indent: " ", enableColors: false }),
+  };
 }
